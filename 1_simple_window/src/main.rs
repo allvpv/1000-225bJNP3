@@ -1,19 +1,21 @@
 use windows::{
-    core::*, Win32::Foundation::*, Win32::Graphics::Gdi::ValidateRect,
+    core::*, Win32::Foundation::*, Win32::Graphics::Gdi::GetSysColorBrush,
+    Win32::Graphics::Gdi::ValidateRect, Win32::Graphics::Gdi::COLOR_WINDOW,
     Win32::System::LibraryLoader::GetModuleHandleA, Win32::UI::WindowsAndMessaging::*,
 };
 
 fn main() -> Result<()> {
     unsafe {
+        /* Get handle to the current process .exe file. */
         let instance = GetModuleHandleA(None)?;
         debug_assert!(instance.0 != 0);
-
-        let window_class = s!("WinAPI madness");
+        let window_class_name = s!("WinAPI madness");
 
         let wc = WNDCLASSA {
             hCursor: LoadCursorW(None, IDC_HELP)?,
             hInstance: instance,
-            lpszClassName: window_class,
+            hbrBackground: GetSysColorBrush(COLOR_WINDOW),
+            lpszClassName: window_class_name,
 
             style: CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc: Some(some_window),
@@ -24,18 +26,18 @@ fn main() -> Result<()> {
         debug_assert!(atom != 0);
 
         CreateWindowExA(
-            WINDOW_EX_STYLE::default(),
-            window_class,
-            s!("This is a sample window"),
-            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            None,
-            None,
-            instance,
-            None,
+            WINDOW_EX_STYLE::default(),       /* style of window */
+            window_class_name,                /* - */
+            s!("This is a sample window"),    /* window title */
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE, /* window style */
+            CW_USEDEFAULT,                    /* horizontal position */
+            CW_USEDEFAULT,                    /* vertical position */
+            500,                              /* width */
+            500,                              /* height */
+            None,                             /* parent of window */
+            None,                             /* handle to a menu */
+            instance,                         /* module associated w/ window */
+            None,                             /* WM_CREATE window message */
         );
 
         let mut message = MSG::default();
@@ -74,6 +76,7 @@ extern "system" fn some_window(
             }
             WM_DESTROY => {
                 println!("WM_DESTROY");
+                /* Post quit message with status 0 to main process loop */
                 PostQuitMessage(0);
                 LRESULT(0)
             }
