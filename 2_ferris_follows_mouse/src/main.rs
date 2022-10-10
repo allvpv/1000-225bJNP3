@@ -186,11 +186,15 @@ extern "system" fn follow_mouse(
                 let width = window_rectangle.right - window_rectangle.left;
                 let height = window_rectangle.bottom - window_rectangle.top;
 
+                let newposx = cursor_position.x - width;
+                let newposy = cursor_position.y - height;
+
+
                 match SetWindowPos(
                     window,
                     HWND_TOPMOST,
-                    cursor_position.x - width,
-                    cursor_position.y - height,
+                    (newposx + 9*window_rectangle.left) / 10,
+                    (newposy + 9*window_rectangle.top) / 10,
                     0,
                     0,
                     SWP_NOSIZE | SWP_NOZORDER,
