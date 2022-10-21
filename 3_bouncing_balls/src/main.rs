@@ -17,7 +17,7 @@ const FPS: u32 = 60;
 const DRAWING_PARAMS: AnimationParams = AnimationParams {
     width: 640 * 2,
     height: 300 * 2,
-    speed: 0.8,
+    speed: 1.,
     foreground: rgb::<100, 255, 100>(),
     background: rgb::<0, 0, 0>(),
     balls_count: 8,
