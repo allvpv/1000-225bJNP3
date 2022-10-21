@@ -68,7 +68,7 @@ extern "system" fn some_window(
     lparam: LPARAM,
 ) -> LRESULT {
     unsafe {
-        match message as u32 {
+        match message {
             WM_PAINT => {
                 println!("WM_PAINT");
                 ValidateRect(window, None);

@@ -163,7 +163,7 @@ extern "system" fn follow_mouse(
     lparam: LPARAM,
 ) -> LRESULT {
     unsafe {
-        match message as u32 {
+        match message {
             WM_PAINT => {
                 ValidateRect(window, None);
                 LRESULT(0)
@@ -173,12 +173,10 @@ extern "system" fn follow_mouse(
                 PostQuitMessage(0);
                 LRESULT(0)
             }
-            WM_CLOSE => {
-                match DestroyWindow(window) {
-                    BOOL(0) => panic!(),
-                    BOOL(_) => LRESULT(0),
-                }
-            }
+            WM_CLOSE => match DestroyWindow(window) {
+                BOOL(0) => panic!(),
+                BOOL(_) => LRESULT(0),
+            },
             WM_TIMER => {
                 let cursor_position = get_cursor_position().unwrap();
                 let window_rectangle = get_window_rectangle(window).unwrap();
@@ -189,12 +187,11 @@ extern "system" fn follow_mouse(
                 let newposx = cursor_position.x - width;
                 let newposy = cursor_position.y - height;
 
-
                 match SetWindowPos(
                     window,
                     HWND_TOPMOST,
-                    (newposx + 9*window_rectangle.left) / 10,
-                    (newposy + 9*window_rectangle.top) / 10,
+                    (newposx + 9 * window_rectangle.left) / 10,
+                    (newposy + 9 * window_rectangle.top) / 10,
                     0,
                     0,
                     SWP_NOSIZE | SWP_NOZORDER,

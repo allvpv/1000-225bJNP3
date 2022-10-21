@@ -74,7 +74,6 @@ fn y_circle(x: f64) -> f64 {
     (1. - x * x).sqrt()
 }
 
-
 fn paint_animation(window: HWND, frame: u32) {
     let mut ps = PAINTSTRUCT::default();
 
@@ -140,7 +139,7 @@ extern "system" fn animation_window(
     lparam: LPARAM,
 ) -> LRESULT {
     unsafe {
-        match message as u32 {
+        match message {
             WM_PAINT => {
                 paint_animation(window, ANIM_WIN_STATE.current_frame_num);
                 ANIM_WIN_STATE.current_frame_num += 1;
