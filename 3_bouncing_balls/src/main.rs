@@ -5,7 +5,7 @@ use windows::{
     Win32::{
         Graphics::Gdi::{
             BeginPaint, CreatePen, CreateSolidBrush, Ellipse, EndPaint, FillRect, InvalidateRect,
-            SelectObject, HBRUSH, HDC, PAINTSTRUCT, PS_SOLID,
+            SelectObject, HBRUSH, HDC, PAINTSTRUCT, PS_SOLID, DeleteObject,
         },
         System::LibraryLoader::GetModuleHandleA,
     },
@@ -15,16 +15,16 @@ const TIMER_ID: usize = 1337; /* Arbitrary nIDEvent value for timer */
 const FPS: u32 = 60;
 
 const DRAWING_PARAMS: AnimationParams = AnimationParams {
-    width: 960,
+    width: 1200,
     height: 720,
     speed: 1.,
     foreground: rgb::<100, 255, 100>(),
     background: rgb::<0, 0, 0>(),
     balls_count: 8,
     ground_fraction: 10,
-    margin_fraction: 8,
+    margin_fraction: 5,
     raise_fraction: 3,
-    shuffle: 8. / 5.,
+    shuffle: 5.,
 };
 
 struct AnimationParams {
@@ -84,7 +84,7 @@ fn get_width_height(window: HWND) -> (i32, i32) {
         GetClientRect(window, &mut rect);
     }
 
-    return (rect.right - rect.left, rect.bottom - rect.top);
+    (rect.right - rect.left, rect.bottom - rect.top)
 }
 
 fn paint_animation(window: HWND, frame: u32) {
@@ -135,6 +135,9 @@ fn paint_animation(window: HWND, frame: u32) {
     }
 
     unsafe {
+        DeleteObject(background_brush);
+        DeleteObject(foreground_brush);
+        DeleteObject(pen);
         EndPaint(window, &ps);
     }
 }
