@@ -15,14 +15,16 @@ const TIMER_ID: usize = 1337; /* Arbitrary nIDEvent value for timer */
 const FPS: u32 = 60;
 
 const DRAWING_PARAMS: AnimationParams = AnimationParams {
-    width: 640 * 2,
-    height: 300 * 2,
+    width: 960,
+    height: 720,
     speed: 1.,
     foreground: rgb::<100, 255, 100>(),
     background: rgb::<0, 0, 0>(),
     balls_count: 8,
     ground_fraction: 10,
     margin_fraction: 8,
+    raise_fraction: 3,
+    shuffle: 8. / 5.,
 };
 
 struct AnimationParams {
@@ -34,6 +36,8 @@ struct AnimationParams {
     balls_count: i32,
     ground_fraction: i32,
     margin_fraction: i32,
+    raise_fraction: i32,
+    shuffle: f64,
 }
 
 const fn rgb<const R: u8, const G: u8, const B: u8>() -> COLORREF {
@@ -101,10 +105,11 @@ fn paint_animation(window: HWND, frame: u32) {
     for i in 0..circles {
         let circle_shift = i as f64 / (circles - 1) as f64;
         let animation_shift = frame_no as f64 / (frames - 1) as f64;
-        let vertical_shift = (circle_shift * (12. / 7.) + animation_shift) % 1.;
+        let vertical_shift = (circle_shift * DRAWING_PARAMS.shuffle + animation_shift) % 1.;
 
+        let max_raise_pixels = DRAWING_PARAMS.height / DRAWING_PARAMS.raise_fraction;
         let raise_factor = y_circle(vertical_shift * 2. - 1.0);
-        let raise_pixels = (200. * raise_factor) as i32;
+        let raise_pixels = (max_raise_pixels as f64 * raise_factor) as i32;
         let rectangle_bottom = groundline - raise_pixels;
 
         let left = next_ellipse_start;
