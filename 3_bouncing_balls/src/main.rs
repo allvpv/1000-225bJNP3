@@ -44,11 +44,11 @@ const fn rgb<const R: u8, const G: u8, const B: u8>() -> COLORREF {
     COLORREF(((B as u32) << 16) | ((G as u32) << 8) | (R as u32))
 }
 
-fn draw_straight_horizontal_line(brush: HBRUSH, hdc: HDC, y: i32) {
+fn draw_straight_horizontal_line(brush: HBRUSH, hdc: HDC, y: i32, width: i32) {
     let rect = RECT {
         top: y,
         left: 0,
-        right: DRAWING_PARAMS.width,
+        right: width,
         bottom: y + 1,
     };
 
@@ -57,15 +57,14 @@ fn draw_straight_horizontal_line(brush: HBRUSH, hdc: HDC, y: i32) {
     }
 }
 
-fn paint_ground(ps: &PAINTSTRUCT, brush: HBRUSH) -> i32 {
-    let groundline_y =
-        DRAWING_PARAMS.height - (DRAWING_PARAMS.height / DRAWING_PARAMS.ground_fraction);
+fn paint_ground(ps: &PAINTSTRUCT, brush: HBRUSH, width: i32, height: i32) -> i32 {
+    let groundline_y = height - (height / DRAWING_PARAMS.ground_fraction);
 
     let mut y = groundline_y;
     let mut step = 1;
 
-    while y < DRAWING_PARAMS.height {
-        draw_straight_horizontal_line(brush, ps.hdc, y);
+    while y < height {
+        draw_straight_horizontal_line(brush, ps.hdc, y, width);
         y += step;
         step += (step + 1) / 2;
     }
@@ -78,15 +77,26 @@ fn y_circle(x: f64) -> f64 {
     (1. - x * x).sqrt()
 }
 
-fn paint_animation(window: HWND, frame: u32) {
-    let mut ps = PAINTSTRUCT::default();
+fn get_width_height(window: HWND) -> (i32, i32) {
+    let mut rect = RECT::default();
 
+    unsafe {
+        GetClientRect(window, &mut rect);
+    }
+
+    return (rect.right - rect.left, rect.bottom - rect.top);
+}
+
+fn paint_animation(window: HWND, frame: u32) {
+    let (width, height) = get_width_height(window);
+
+    let mut ps = PAINTSTRUCT::default();
     let hdc = unsafe { BeginPaint(window, &mut ps) };
     let background_brush = unsafe { CreateSolidBrush(DRAWING_PARAMS.background) };
     let foreground_brush = unsafe { CreateSolidBrush(DRAWING_PARAMS.foreground) };
     let pen = unsafe { CreatePen(PS_SOLID, 1, DRAWING_PARAMS.foreground) };
 
-    let groundline = paint_ground(&ps, foreground_brush);
+    let groundline = paint_ground(&ps, foreground_brush, width, height);
 
     unsafe {
         SelectObject(ps.hdc, background_brush);
@@ -94,8 +104,8 @@ fn paint_animation(window: HWND, frame: u32) {
     }
 
     let circles = DRAWING_PARAMS.balls_count;
-    let margin = DRAWING_PARAMS.width / DRAWING_PARAMS.margin_fraction;
-    let ellipse_diameter = (DRAWING_PARAMS.width - 2 * margin) / circles;
+    let margin = width / DRAWING_PARAMS.margin_fraction;
+    let ellipse_diameter = (width - 2 * margin) / circles;
 
     let mut next_ellipse_start = margin;
 
@@ -107,7 +117,7 @@ fn paint_animation(window: HWND, frame: u32) {
         let animation_shift = frame_no as f64 / (frames - 1) as f64;
         let vertical_shift = (circle_shift * DRAWING_PARAMS.shuffle + animation_shift) % 1.;
 
-        let max_raise_pixels = DRAWING_PARAMS.height / DRAWING_PARAMS.raise_fraction;
+        let max_raise_pixels = height / DRAWING_PARAMS.raise_fraction;
         let raise_factor = y_circle(vertical_shift * 2. - 1.0);
         let raise_pixels = (max_raise_pixels as f64 * raise_factor) as i32;
         let rectangle_bottom = groundline - raise_pixels;
@@ -147,7 +157,6 @@ extern "system" fn animation_window(
         match message {
             WM_PAINT => {
                 paint_animation(window, ANIM_WIN_STATE.current_frame_num);
-                ANIM_WIN_STATE.current_frame_num += 1;
                 LRESULT(0)
             }
             WM_DESTROY => {
@@ -163,6 +172,7 @@ extern "system" fn animation_window(
                 BOOL(_) => LRESULT(0),
             },
             WM_TIMER => {
+                ANIM_WIN_STATE.current_frame_num += 1;
                 InvalidateRect(window, None, true);
                 LRESULT(0)
             }
