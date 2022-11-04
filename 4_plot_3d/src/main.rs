@@ -5,45 +5,54 @@ use windows::{
     Win32::UI::WindowsAndMessaging::*,
 };
 
-const X_POINTS: usize = 51;
-const Y_POINTS: usize = 51;
-
-type PlotArray = [[(f64, f64, f64); Y_POINTS]; X_POINTS];
-
-struct Plot {
-    array: PlotArray,
+struct DrawingParams {
+    function: fn(f64, f64) -> f64,
+    x_points: usize,
+    y_points: usize,
     spread: f64,
     x_shift: f64,
     y_shift: f64,
 }
 
+const PARAMS: DrawingParams = DrawingParams {
+    function: |x: f64, y: f64| -> f64 { (10. * (x * x + y * y).sqrt()).cos() / 4. },
+    x_points: 51,
+    y_points: 51,
+    spread: 200.,
+    x_shift: 400.,
+    y_shift: 350.,
+};
+
+type PlotArray = [[(f64, f64, f64); PARAMS.y_points]; PARAMS.x_points];
+
+struct Plot {
+    // Box to prevent stack overflow when x_points, y_points >~ 100
+    array: Box<PlotArray>,
+}
+
 impl Plot {
-    pub fn get_initial_plot<F>(function: F, spread: f64, x_shift: f64, y_shift: f64) -> Plot
+    pub fn get_initial_plot<F>(function: F) -> Plot
     where
         F: Fn(f64, f64) -> f64,
     {
-        let mut array: PlotArray = [[(0., 0., 0.); Y_POINTS]; X_POINTS];
+        let mut array = Box::new([[(0., 0., 0.); PARAMS.y_points]; PARAMS.x_points]);
 
         for (i, row) in array.iter_mut().enumerate() {
             // map [0; Y_POINTS) -> [-1, 1]
-            let y = ((i as i64 - (Y_POINTS / 2) as i64) as f64) / ((Y_POINTS / 2) as f64);
+            let y =
+                ((i as i64 - (PARAMS.y_points / 2) as i64) as f64) / ((PARAMS.y_points / 2) as f64);
 
             for (j, value) in row.iter_mut().enumerate() {
                 // map [0; X_POINTS) -> [-1, 1]
-                let x = ((j as i64 - (X_POINTS / 2) as i64) as f64) / ((X_POINTS / 2) as f64);
+                let x = ((j as i64 - (PARAMS.x_points / 2) as i64) as f64)
+                    / ((PARAMS.x_points / 2) as f64);
                 let z = function(x, y);
-
                 let (x_prim, y_prim) = Self::rotate_around_z(x, y, std::f64::consts::PI / 4.);
                 *value = (x_prim, y_prim, z);
             }
         }
 
-        Plot {
-            array,
-            spread,
-            x_shift,
-            y_shift,
-        }
+        Plot { array }
     }
 
     fn rotate_around_z(x: f64, y: f64, alpha: f64) -> (f64, f64) /* x, y */ {
@@ -60,18 +69,15 @@ impl Plot {
         let (x, y_orig, z) = self.array[i][j];
         let y = Self::project_onto_plane(y_orig, z, alpha);
 
-        let x_pixel = x * self.spread as f64 + self.x_shift;
-        let y_pixel = y * self.spread as f64 + self.y_shift;
+        let x_pixel = x * PARAMS.spread + PARAMS.x_shift;
+        let y_pixel = y * PARAMS.spread + PARAMS.y_shift;
 
         (x_pixel as f32, y_pixel as f32)
     }
 }
 
 struct Graphics {
-    factory: ID2D1Factory,
     render_target: ID2D1HwndRenderTarget,
-    width: u32,
-    height: u32,
     plot: Plot,
     brush: ID2D1SolidColorBrush,
 }
@@ -81,20 +87,20 @@ impl Graphics {
         self.begin_draw();
         self.clear_screen(0., 0., 0.);
 
-        for i in 0..Y_POINTS {
+        for i in 0..PARAMS.y_points {
             let mut previous_point = self.plot.get_pixel_value(i, 0, alpha);
 
-            for j in 1..X_POINTS {
+            for j in 1..PARAMS.x_points {
                 let next_point = self.plot.get_pixel_value(i, j, alpha);
                 self.draw_line(previous_point, next_point);
                 previous_point = next_point;
             }
         }
 
-        for j in 0..X_POINTS {
+        for j in 0..PARAMS.x_points {
             let mut previous_point = self.plot.get_pixel_value(0, j, alpha);
 
-            for i in 1..Y_POINTS {
+            for i in 1..PARAMS.y_points {
                 let next_point = self.plot.get_pixel_value(i, j, alpha);
                 self.draw_line(previous_point, next_point);
                 previous_point = next_point;
@@ -135,15 +141,10 @@ impl Graphics {
             )?
         };
 
-        let function_to_plot = |x: f64, y: f64| (10. * (x * x + y * y).sqrt()).cos() / 4.;
-
         Ok(Graphics {
-            factory,
             render_target,
             brush,
-            width,
-            height,
-            plot: Plot::get_initial_plot(function_to_plot, 200., 400., 300.),
+            plot: Plot::get_initial_plot(PARAMS.function),
         })
     }
 
@@ -164,7 +165,7 @@ impl Graphics {
         }
     }
 
-    fn begin_draw(&self) -> () {
+    fn begin_draw(&self) {
         unsafe {
             self.render_target.BeginDraw();
         }
@@ -224,13 +225,8 @@ impl Timer {
         })
     }
 
-    fn get_time_total(&self) -> f64 {
+    fn get_time(&self) -> f64 {
         let delta = (self.current_call_to_update - self.start_time) as f64;
-        delta / (self.frequency as f64)
-    }
-
-    fn get_time_delta(&self) -> f64 {
-        let delta = (self.current_call_to_update - self.previous_call_to_update) as f64;
         delta / (self.frequency as f64)
     }
 
@@ -248,7 +244,6 @@ struct Window {
     client_area_width: i32,
     client_area_height: i32,
     graphics: Option<Graphics>,
-    alpha: f64,
 }
 
 impl Window {
@@ -260,7 +255,6 @@ impl Window {
             client_area_width: 0,
             client_area_height: 0,
             graphics: None,
-            alpha: 0.,
         })
     }
 
@@ -272,15 +266,16 @@ impl Window {
                     BeginPaint(self.handle, &mut ps);
 
                     if let Some(graphics) = &self.graphics {
-                        graphics.render(self.alpha).unwrap();
+                        graphics.render(self.timer.get_time()).unwrap();
                     }
 
                     EndPaint(self.handle, &ps);
                     LRESULT(0)
                 }
-                WM_DISPLAYCHANGE => {
+
+                WM_SIZE | WM_DISPLAYCHANGE => {
                     if let Some(graphics) = &self.graphics {
-                        graphics.render(self.alpha).unwrap();
+                        graphics.render(self.timer.get_time()).unwrap();
                     }
                     LRESULT(0)
                 }
@@ -364,26 +359,20 @@ impl Window {
                 SWP_NOMOVE,
             );
 
-            self.graphics = Some(Graphics::new(&self)?);
+            self.graphics = Some(Graphics::new(self)?);
 
             let mut message = MSG::default();
 
             loop {
-                if self.visible {
-                    if let Some(graphics) = &self.graphics {
-                        self.timer.reset()?;
-                        println!("t: {}", self.timer.get_time_total());
-                        graphics.render(self.timer.get_time_total())?;
-                    }
+                if let Some(graphics) = &self.graphics {
+                    self.timer.reset()?;
+                    println!("t: {}", self.timer.get_time());
+                    graphics.render(self.timer.get_time())?;
+                }
 
-                    // Non-blocking
-                    match PeekMessageA(&mut message, None, 0, 0, PM_REMOVE) {
-                        BOOL(0) => continue,
-                        BOOL(_) => (),
-                    }
-                } else {
-                    // Blocking
-                    GetMessageA(&mut message, None, 0, 0);
+                match PeekMessageA(&mut message, None, 0, 0, PM_REMOVE) {
+                    BOOL(0) => continue,
+                    BOOL(_) => (),
                 }
 
                 match message.message {
