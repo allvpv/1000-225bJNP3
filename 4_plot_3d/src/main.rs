@@ -38,14 +38,14 @@ impl Plot {
         let mut array = Box::new([[(0., 0., 0.); PARAMS.y_points]; PARAMS.x_points]);
 
         for (i, row) in array.iter_mut().enumerate() {
-            // map [0; Y_POINTS) -> [-1, 1]
-            let y =
-                ((i as i64 - (PARAMS.y_points / 2) as i64) as f64) / ((PARAMS.y_points / 2) as f64);
+            // map [0; X_POINTS) -> [-1, 1]
+            let x =
+                ((i as i64 - (PARAMS.x_points / 2) as i64) as f64) / ((PARAMS.x_points / 2) as f64);
 
             for (j, value) in row.iter_mut().enumerate() {
                 // map [0; X_POINTS) -> [-1, 1]
-                let x = ((j as i64 - (PARAMS.x_points / 2) as i64) as f64)
-                    / ((PARAMS.x_points / 2) as f64);
+                let y = ((j as i64 - (PARAMS.y_points / 2) as i64) as f64)
+                    / ((PARAMS.y_points / 2) as f64);
                 let z = function(x, y);
                 let (x_prim, y_prim) = Self::rotate_around_z(x, y, std::f64::consts::PI / 4.);
                 *value = (x_prim, y_prim, z);
@@ -87,20 +87,20 @@ impl Graphics {
         self.begin_draw();
         self.clear_screen(0., 0., 0.);
 
-        for i in 0..PARAMS.y_points {
+        for i in 0..PARAMS.x_points {
             let mut previous_point = self.plot.get_pixel_value(i, 0, alpha);
 
-            for j in 1..PARAMS.x_points {
+            for j in 1..PARAMS.y_points {
                 let next_point = self.plot.get_pixel_value(i, j, alpha);
                 self.draw_line(previous_point, next_point);
                 previous_point = next_point;
             }
         }
 
-        for j in 0..PARAMS.x_points {
+        for j in 0..PARAMS.y_points {
             let mut previous_point = self.plot.get_pixel_value(0, j, alpha);
 
-            for i in 1..PARAMS.y_points {
+            for i in 1..PARAMS.x_points {
                 let next_point = self.plot.get_pixel_value(i, j, alpha);
                 self.draw_line(previous_point, next_point);
                 previous_point = next_point;
