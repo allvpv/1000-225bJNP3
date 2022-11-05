@@ -47,8 +47,7 @@ impl Plot {
                 let y = ((j as i64 - (PARAMS.y_points / 2) as i64) as f64)
                     / ((PARAMS.y_points / 2) as f64);
                 let z = function(x, y);
-                let (x_prim, y_prim) = Self::rotate_around_z(x, y, std::f64::consts::PI / 4.);
-                *value = (x_prim, y_prim, z);
+                *value = (x, y, z);
             }
         }
 
@@ -66,8 +65,9 @@ impl Plot {
     }
 
     pub fn get_pixel_value(&self, i: usize, j: usize, alpha: f64) -> (f32, f32) {
-        let (x, y_orig, z) = self.array[i][j];
-        let y = Self::project_onto_plane(y_orig, z, alpha);
+        let (x, y, z) = self.array[i][j];
+        let (x, y) = Self::rotate_around_z(x, y, alpha/8.);
+        let y = Self::project_onto_plane(y, z, alpha);
 
         let x_pixel = x * PARAMS.spread + PARAMS.x_shift;
         let y_pixel = y * PARAMS.spread + PARAMS.y_shift;
@@ -187,8 +187,7 @@ fn main() -> Result<()> {
 
 struct Timer {
     start_time: i64,
-    previous_call_to_update: i64,
-    current_call_to_update: i64,
+    update_time: i64,
     frequency: i64,
 }
 
@@ -219,20 +218,21 @@ impl Timer {
 
         Ok(Timer {
             start_time: counter,
-            previous_call_to_update: counter,
-            current_call_to_update: counter,
+            update_time: counter,
             frequency,
         })
     }
 
-    fn get_time(&self) -> f64 {
-        let delta = (self.current_call_to_update - self.start_time) as f64;
-        delta / (self.frequency as f64)
+    fn get_time(&self, period_in_seconds: u32) -> f64 {
+        let delta = self.update_time.wrapping_sub(self.start_time);
+        let period = self.frequency * period_in_seconds as i64;
+        let time = delta % period;
+
+        time as f64 / self.frequency as f64
     }
 
-    fn reset(&mut self) -> Result<()> {
-        self.previous_call_to_update = self.current_call_to_update;
-        self.current_call_to_update = Self::query_performance_counter()?;
+    fn update(&mut self) -> Result<()> {
+        self.update_time = Self::query_performance_counter()?;
         Ok(())
     }
 }
@@ -244,6 +244,7 @@ struct Window {
     client_area_width: i32,
     client_area_height: i32,
     graphics: Option<Graphics>,
+    alpha: f64,
 }
 
 impl Window {
@@ -255,6 +256,7 @@ impl Window {
             client_area_width: 0,
             client_area_height: 0,
             graphics: None,
+            alpha: 0.,
         })
     }
 
@@ -266,7 +268,7 @@ impl Window {
                     BeginPaint(self.handle, &mut ps);
 
                     if let Some(graphics) = &self.graphics {
-                        graphics.render(self.timer.get_time()).unwrap();
+                        graphics.render(self.alpha).unwrap();
                     }
 
                     EndPaint(self.handle, &ps);
@@ -275,7 +277,7 @@ impl Window {
 
                 WM_SIZE | WM_DISPLAYCHANGE => {
                     if let Some(graphics) = &self.graphics {
-                        graphics.render(self.timer.get_time()).unwrap();
+                        graphics.render(self.alpha).unwrap();
                     }
                     LRESULT(0)
                 }
@@ -365,9 +367,9 @@ impl Window {
 
             loop {
                 if let Some(graphics) = &self.graphics {
-                    self.timer.reset()?;
-                    println!("t: {}", self.timer.get_time());
-                    graphics.render(self.timer.get_time())?;
+                    self.alpha = self.timer.get_time(48) * std::f64::consts::PI / 3.;
+                    graphics.render(self.alpha)?;
+                    self.timer.update()?;
                 }
 
                 match PeekMessageA(&mut message, None, 0, 0, PM_REMOVE) {

@@ -1,4 +1,5 @@
-# Animated function plot 
+# Animated function plot
 
-Beautiful animated plot of three-dimensional function. Uses Direct2D and linear
-transformations to project the function onto the plane.
+[Direct2D]. A beautifully animated plot of the three-dimensional function.
+Because it uses orthogonal projection and gridline mesh, it looks good only for
+some functions (for many others not)
